@@ -1,7 +1,6 @@
 # WHR Optimization Framework
 
-[](https://www.python.org/)
-[](LICENSE)
+[![DOI](https://zenodo.org/badge/1250919465.svg)](https://doi.org/10.5281/zenodo.20756923)
 
 A computational framework for optimization of waste hear recovery technology that uses packed-bed direct-contact condensers.
 
@@ -47,6 +46,6 @@ This project is licensed under the MIT License — see the [LICENSE](LICENSE) fi
 
 ## Citation
 
-If you use this framework in your research, please cite the accompanying paper:
+If you use this framework in your research, please cite as follows:
 
-> *M. Nikitin, D. Pashchenko*. Cross-validation of semi-empirical pressure drop correlations for randomly packed beds: A consensus-based framework for gap detection and training dataset generation (in press)
+> Nikitin, M. (2026). WHR Optimization Framework (Version milestone). Zenodo. DOI: [10.5281/zenodo.20756923](https://doi.org/10.5281/zenodo.20756923)
