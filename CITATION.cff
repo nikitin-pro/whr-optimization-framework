@@ -10,6 +10,9 @@ authors:
     email: maxim.nikitin@gtiit.edu.cn
     orcid: 'https://orcid.org/0000-0002-2535-6076'
     affiliation: Guangdong Technion-Israel Institute of Technology
+identifiers:
+  - type: doi
+    value: '10.5281/zenodo.20756923'
 repository-code: 'https://github.com/nikitin-pro/whr-optimization-framework'
 abstract: >-
   This framework compiles and synthesizes experimental and
