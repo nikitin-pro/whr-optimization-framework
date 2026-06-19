@@ -11,7 +11,7 @@ This framework compiles and synthesizes experimental and analytical data on heat
 The framework is at the development stage now. Currently, only the hydraulics segment is available.
 
 <p align="center">
-  <a href="README-CW.md">
+  <a href="README_CW.md">
     <img alt="Documentation on Cross-Validation" src="https://img.shields.io/badge/Documentation on Cross--Validation-green">
   </a>
 </p>
