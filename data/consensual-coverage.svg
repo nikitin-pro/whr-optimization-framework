@@ -1,5 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape" version="1.1" width="385.007" height="178.33" viewBox="0 0 385.007 178.33">
-<defs>
+<rect width="100%" height="100%" fill="white"/>
+  <defs>
 <clipPath id="clip_1">
 <path transform="matrix(1,0,0,-1,45.561,132.369)" d="M0 0H323.67597V111.06868H0Z"/>
 </clipPath>
