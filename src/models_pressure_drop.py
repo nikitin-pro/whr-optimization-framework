@@ -2,21 +2,40 @@ import numpy as np
 
 __all__ = [
     'carman1937', 'morcom1946', 'rose1949', 'leva1949', 'ergun1952',
-    'fahien1961', 'wentz1963', 'kurten1966', 'handley1968',
+    'wentz1963', 'kurten1966', 'handley1968',
     'mehta1969', 'hicks1970', 'tallmadge1970', 'reichelt1972', 'kuo1978',
-    'macdonald1979', 'kta1981', 'jones1983', 'foscolo1983', 'meyer1985',
+    'macdonald1979', 'kta1981', 'jones1983', 'foscolo1983', 'fahien1983', 'meyer1985',
     'paterson1986', 'stichlmair1989', 'watanabe1989', 'comiti1989', 'fand1990',
     'foumeny1993', 'lee1994', 'liu1994', 'hayes1995', 'avontuur1996', 'critoph1996',
     'oneill1997', 'raichura1999', 'eisfeld2001', 'yu2002', 'felice2004',
     'nemec2005', 'montillet2007', 'carpinlioglu2008', 'ozahi2008', 'cheng2011',
-    'harrison2013', 'erdim2015', 'guo2017', 'seckendorff2020', 'reger2023',
+    'harrison2013', 'erdim2015', 'guo2017', 'seckendorff2020', 'cheng2021', 'reger2023',
     'dixon2023', 'wu2025', 'xu2026',
 ]
 
 ############################################################################################
-def carman1937(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def test(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
-  Calculate pressure drop across packed bed using Carman-Kozeny equation
+  Calculate pressure drop across packed bed using test equation
+  """
+
+  D_p = D_p_eff
+  ε = ε_eff
+  Re_m = Re_p / (1 - ε)
+  valid = (
+     (phi_s >= 0.98)        # test
+  )
+
+  F_s = 150 / Re_m + 1.75
+  ΔP = L * F_s * ρ_G_avg * U_s_G_in**2 / D_p * (1 - ε) / ε**3  # Total pressure drop
+  ΔP_array = np.where(valid, ΔP, np.nan)
+
+  return { 'ΔP': ΔP_array }
+
+############################################################################################
+def carman1937(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+  """
+  Calculate pressure drop across packed bed using Carman--Kozeny equation
   https://doi.org/10.1016/S0263-8762(97)80003-2
   """
 
@@ -24,7 +43,7 @@ def carman1937(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **k
   ε = ε_eff
   S = 6 * (1 - ε) / phi_s / D_p           # specific surface area of particles [m²/m³]
   S1 = S + 4 / D                          # wall correction
-  Re_1 = Re_m * phi_s / 6
+  Re_1 = Re_p * phi_s / 6 / (1 - ε)
   valid = (
     (Re_1 >= 0.01) & (Re_1 <= 10000)   # carman1937, Summary p.15
     & (D/D_p >= 2)                     # carman1937, deduced from Appendix III and wall-effect discussion
@@ -39,10 +58,11 @@ def carman1937(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **k
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def morcom1946(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def morcom1946(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Morcom equation
   https://scholar.google.com/scholar_lookup?title=Fluid%20flow%20through%20granular%20materials&publication_year=1946&author=A.R.%20Morcom
+  A.R. Morcom, Fluid flow through granular materials, Chemical Engineering Research and Design 24 (1946), pp. 30-43.
   no text available, reference only: erdim2015revisit https://doi.org/10.1016/j.powtec.2015.06.017
   """
 
@@ -51,7 +71,6 @@ def morcom1946(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **k
   valid = (
     (Re_p < 750)                         # erdim2015revisit https://doi.org/10.1016/j.powtec.2015.06.017
     & (phi_s >= 0.95)                    # erdim2015revisit https://doi.org/10.1016/j.powtec.2015.06.017
-    #& (ε >= 0.36) & (ε <= 0.4)           # assumed
     & (D/D_p > 5)                        # erdim2015revisit https://doi.org/10.1016/j.powtec.2015.06.017
   )
 
@@ -62,7 +81,7 @@ def morcom1946(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **k
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def rose1949(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def rose1949(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Rose & Rizk equation
   https://doi.org/10.1243/PIME_PROC_1949_160_047_02
@@ -77,7 +96,7 @@ def rose1949(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwa
     & (ε >= 0.3) & (ε <= 0.9)            # rose1949 from Abstract
   )
 
-  f = 54.3218 * ε**4 - 156.3496 * ε**3 + 169.7978 * ε**2 - 83.0717 * ε + 15.6676 # correction by erdim2015revisit https://doi.org/10.1016/j.powtec.2015.06.017 to exapnd ε range
+  f = 36 * np.exp(-0.0915 * ε) + 0.055  # from Fig. 1
   F_p = (1000 / Re_p + 125 / Re_p**0.5 + 14) * f
   ΔP = L * F_p * ρ_G_avg * U_s_G_in**2 / D_p  # Total pressure drop
   ΔP_array = np.where(valid, ΔP, np.nan)
@@ -85,7 +104,7 @@ def rose1949(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwa
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def leva1949(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def leva1949(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Leva equation
   D.W. Green, R.H. Perry (Eds.), Perry's Chemical Engineers' Handbook (Eight edition), Chem. Eng., 56 (1949), pp. 115-117
@@ -105,7 +124,6 @@ def leva1949(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwa
   S1 = 7.60657 - 19.2986 * x + 21.02695 * x**2  - 10.96663 * x**3 + 3.02928 * x**4 - 0.42867 * x**5 + 0.02453 * x**6
   n = np.where(Re_p < 11.5, 1, S1)
   S2 = 1.982535 - 1.0218594 * Re_p + 0.0295464 * Re_p**2 + 0.0269893 * Re_p**3 + 0.0024996 * Re_p**4 - 0.0008754 * Re_p**5
-  n = 1
   F_m = 10**S2
   ΔP = 2 * L * F_m * ρ_G_avg * U_s_G_in**2 / D_p * (1 - ε)**(3 - n) / ε**3  # Total pressure drop
   ΔP_array = np.where(valid, ΔP, np.nan)
@@ -113,14 +131,16 @@ def leva1949(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwa
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def ergun1952(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def ergun1952(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Ergun equation
-  https://www.semanticscholar.org/paper/Fluid-flow-through-packed-columns-Ergun/f791e34262a8909299027036132288d68eb07a99
+  S. Ergun, Fluid flow through packed columns, Chem. Eng. Progress 48(2) (1952), pp. 89-94.
+  https://api.semanticscholar.org/CorpusID:135806248
   """
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_m >= 1.2) & (Re_m <= 4200)   # erdim2015revisit https://doi.org/10.1016/j.ijheatmasstransfer.2024.126620, range Re₁ = 0.2-700, where Re₁ = Re_m/6
     & (D/D_p > 10)                   # ergun1952, from page 5
@@ -134,7 +154,7 @@ def ergun1952(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def brauer1957removed(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def brauer1957removed(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Brauer equation
 
@@ -148,6 +168,7 @@ def brauer1957removed(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_m >= 10) & (Re_m <= 20000)    # brauer1957, Fig. 5
      & (L/D >= 0.86) & (L/D <= 3.59)  # brauer1957, from page 5: H = 30-80 cm, D = 22.3 & 35 cm
@@ -162,33 +183,7 @@ def brauer1957removed(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def fahien1961(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
-  """
-  Calculate pressure drop across packed bed using Fahien & Schriver equation
-  Fahien, R. W., & Schriver, C. B. (1983). Paper presented and Denver meeting of AIChE. Fundamentals of Transport Phenomena, McGraw-Hill, New York.
-  !! no original text found
-  """
-
-  D_p = D_p_eff
-  ε = ε_eff
-  valid = (
-    (phi_s >= 0.95)                    # guessed
-    #& (ε >= 0.36) & (ε <= 0.42)        # guessed
-    #& (D/D_p > 5)                      # guessed
-  )
-
-  q = np.exp(-ε**2 * (1 - ε) * Re_m / 12.6)
-  f_1L = 136 / (1- ε)**0.38
-  f_1T = 29 / (1 - ε)**1.45 / ε**2
-  f2 = 1.87 * ε**0.75 / (1 - ε)**0.26
-  F_s = q * f_1L / Re_m + (1 - q) * (f2 + f_1T / Re_m) # erdim2015revisit https://doi.org/10.1016/j.powtec.2015.06.017
-  ΔP = L * F_s * ρ_G_avg * U_s_G_in**2 / D_p * (1 - ε) / ε**3  # Total pressure drop
-  ΔP_array = np.where(valid, ΔP, np.nan)
-
-  return { 'ΔP': ΔP_array }
-
-############################################################################################
-def wentz1963(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def wentz1963(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Wentz & Thodos equation
   https://doi.org/10.1002/aic.690090118
@@ -196,6 +191,7 @@ def wentz1963(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_m > 2550) & (Re_m < 64900)        # wentz1963, from abstract
     & (L/D_p >= 5)                        # wentz1963, "five layers of spheres"
@@ -212,7 +208,7 @@ def wentz1963(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def kurten1966(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def kurten1966(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Kürten et al. equation
   https://doi.org/10.1002/cite.330380905
@@ -222,6 +218,7 @@ def kurten1966(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **k
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_p >= 0.1) & (Re_p <= 4000)       # kurten1966
     & (phi_s >= 0.95)                    # kurten1966
@@ -234,15 +231,17 @@ def kurten1966(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **k
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def handley1968(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def handley1968(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Handley & Heggs equation
   https://scholar.google.com/scholar?cluster=8679261533528586850&hl=en&as_sdt=0,5
+  D. Handly, Momentum and heat transfer mechanisms in regular shaped packings. Trans. Inst. Chem. Eng., 46 (1968), pp. 251-259.
   !! no orig paper found
   """
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_p > 200) & (Re_p < 13000)    # erdim2015revisit https://doi.org/10.1016/j.powtec.2015.06.017
     & (phi_s >= 0.8)                 # cylinders are mentioned by critoph1996, p. 2
@@ -256,7 +255,7 @@ def handley1968(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def mehta1969(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def mehta1969(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Mehta & Hawley equation
   https://doi.org/10.1021/i260030a021
@@ -264,6 +263,7 @@ def mehta1969(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   M = 1 + 0.66667 * D_p / (1 - ε) / D  # Eq. (4)
   valid = (
     (Re_m/M <= 10)                   # mehta1969, Fig. 3
@@ -278,7 +278,7 @@ def mehta1969(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def hicks1970(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def hicks1970(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Hicks equation
   https://doi.org/10.1021/i160035a032
@@ -286,6 +286,7 @@ def hicks1970(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_m > 300) & (Re_m < 60000)    # hicks1970, p. 3
     & (phi_s >= 0.95)                # hicks1970
@@ -298,7 +299,7 @@ def hicks1970(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def tallmadge1970(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def tallmadge1970(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Tallmadge equation
   https://doi.org/10.1002/aic.690160639
@@ -306,6 +307,7 @@ def tallmadge1970(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, 
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_m > 0.1) & (Re_m < 100_000)  # tallmadge1970, Eq. (2)
     & (phi_s >= 0.95)                # tallmadge1970
@@ -319,7 +321,7 @@ def tallmadge1970(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, 
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def reichelt1972(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def reichelt1972(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Reichelt equation
   https://doi.org/10.1002/cite.330441806
@@ -327,6 +329,7 @@ def reichelt1972(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, *
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   Re_w = Re_m / (1 + 0.67 * D_p / D / (1 - ε))
   valid = (
     (Re_w >= 0.2) & (Re_w <= 30000)      # reichelt1972
@@ -343,16 +346,17 @@ def reichelt1972(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, *
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def kuo1978(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def kuo1978(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Kuo & Nydegger equation
-  Kuo, K. K., & Nydegger, C. C. (1978). Flow resistance measurements and correlation in a packed bed of WC 870 ball propellants. Journal of Ballistics, 2(1), 1-25.
+  K.K. Kuo, C.C. Nydegger, Flow resistance measurements and correlation in a packed bed of WC 870 ball propellants. J. of Ballistics 2(1) (1978), pp. 1-25.
 
   !! no orig paper found, but have confirmation in two sources ( erdim2015revisit and report to Defense Technical Information Center (DTIC, https://apps.dtic.mil/sti/tr/pdf/ADA091300.pdf))
   """
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_p >= 460) & (Re_p <= 14600)        # erdim2015revisit https://doi.org/10.1016/j.powtec.2015.06.017
     #& (phi_s >= 0.8) & (phi_s < 0.95)      # assumed as the exp particles were not spherical
@@ -366,7 +370,7 @@ def kuo1978(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwar
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def macdonald1979(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def macdonald1979(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Macdonald et al. equation
   https://doi.org/10.1021/i160071a001
@@ -374,6 +378,7 @@ def macdonald1979(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, 
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_m <= 10000)                        # macdonald1979, Fig. 10
     & (phi_s >=0.6) & (phi_s <= 1)         # macdonald1979, spherical φ_s=1 (Gupte data), irregular φ_s=0.6 (p.6, Table III), equilateral cylinders ~0.87
@@ -387,7 +392,7 @@ def macdonald1979(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, 
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def kta1981(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def kta1981(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using KTA equation
   https://www.kta-gs.de/e/standards/3100/3102_3_engl_1981_03.pdf
@@ -395,6 +400,7 @@ def kta1981(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwar
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   cond1 = (Re_m <= 1000) & (D/D_p > 34.35 - 0.06 * Re_m)
   cond2 = (Re_m > 1000) & (D/D_p > 5)
   valid = (
@@ -411,7 +417,7 @@ def kta1981(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwar
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def jones1983(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def jones1983(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Jones & Krier equation
   https://doi.org/10.1115/1.3240959
@@ -419,6 +425,7 @@ def jones1983(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_m > 733) & (Re_m < 126670)             # jones1983, Table 2
     & (L/D > 3.5)                              # jones1983, verified for L/D=3.94 from test section (page 2)
@@ -434,7 +441,7 @@ def jones1983(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def foscolo1983(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def foscolo1983(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Foscolo et al. equation
   https://doi.org/10.1016/0009-2509(83)80045-1
@@ -454,7 +461,34 @@ def foscolo1983(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def meyer1985(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def fahien1983(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+  """
+  Calculate pressure drop across packed bed using Fahien & Schriver equation
+  Fahien, R. W., & Schriver, C. B. (1983). Paper presented and Denver meeting of AIChE. Fundamentals of Transport Phenomena, McGraw-Hill, New York.
+  !! no original text found
+  """
+
+  D_p = D_p_eff
+  ε = ε_eff
+  Re_m = Re_p / (1 - ε)
+  valid = (
+    (phi_s >= 0.95)                    # guessed
+    #& (ε >= 0.36) & (ε <= 0.42)        # guessed
+    #& (D/D_p > 5)                      # guessed
+  )
+
+  q = np.exp(-ε**2 * (1 - ε) * Re_m / 12.6)
+  f_1L = 136 / (1- ε)**0.38
+  f_1T = 29 / (1 - ε)**1.45 / ε**2
+  f2 = 1.87 * ε**0.75 / (1 - ε)**0.26
+  F_s = q * f_1L / Re_m + (1 - q) * (f2 + f_1T / Re_m) # erdim2015revisit https://doi.org/10.1016/j.powtec.2015.06.017
+  ΔP = L * F_s * ρ_G_avg * U_s_G_in**2 / D_p * (1 - ε) / ε**3  # Total pressure drop
+  ΔP_array = np.where(valid, ΔP, np.nan)
+
+  return { 'ΔP': ΔP_array }
+
+############################################################################################
+def meyer1985(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Meyer & Smith equation
   https://doi.org/10.1021/i100019a013
@@ -465,6 +499,7 @@ def meyer1985(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   S_v = 6 * (1 - ε) / phi_s / D_p    # specific surface area of particles [m²/m³]
   G0 = U_s_G_in * ρ_G_avg            # Superficial mass flux [kg/(m²·s)]
   Re_s = Re_m * phi_s / 6            # Re_s = G0 / μ / S_v = ρ·U_s·D_p·ϕ_s / (6μ·(1-ε))
@@ -480,7 +515,7 @@ def meyer1985(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def paterson1986(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def paterson1986(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Paterson et al. equation
   Paterson, W. R., Burns, J. R. M., Griffiths, N. B., Kesterton, K. R., & Paveley, A. J. (1986). Experimental studies of transport processes in packed beds of low tube-to-particle diameter ratio. In World Congress III of Chemical Engineering Tokyo (pp. 304-307).
@@ -490,6 +525,7 @@ def paterson1986(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, *
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_p > 25) & (Re_p < 900)           # erdim2015revisit https://doi.org/10.1016/j.powtec.2015.06.017
     & (phi_s >= 0.95)                    # assumed
@@ -506,7 +542,7 @@ def paterson1986(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, *
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def stichlmair1989(D, L, D_p_eff, ε_eff, h_L, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def stichlmair1989(D, L, D_p_eff, ε_eff, h_L, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Stichlmair equation
   https://doi.org/10.1016/0950-4214(89)80016-7
@@ -529,10 +565,10 @@ def stichlmair1989(D, L, D_p_eff, ε_eff, h_L, Re_m, Re_p, phi_s, ρ_G_avg, U_s_
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def watanabe1989(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def watanabe1989(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Watanabe equation
-  Watanabe, H. (1989). Drag coefficient and voidage function on fluid-flow through granular packed-beds. International Journal of Engineering Fluid Mechanics, 2(1), 93-108.
+  H. Watanabe. Drag coefficient and voidage function on fluid-flow through granular packed-beds. Int. J. of Eng. Fluid Mechanics 2(1) (1989), pp. 93-108.
 
   !! no orig paper found
   """
@@ -553,7 +589,7 @@ def watanabe1989(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, *
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def comiti1989(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def comiti1989(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Comiti & Renaud equation
   https://doi.org/10.1016/0009-2509(89)80031-4
@@ -578,7 +614,7 @@ def comiti1989(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **k
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def fand1990(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def fand1990(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Fand et al. equation
   https://doi.org/10.1115/1.3242658   1987
@@ -587,6 +623,7 @@ def fand1990(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwa
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   M = 1 + 0.666667 * D_p / (1 - ε) / D    # Mehta coeff for wall effects
   Re_w = Re_m / M
   valid = (
@@ -646,7 +683,7 @@ def fand1990(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwa
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def foumeny1993(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def foumeny1993(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Foumeny et al. equation
   https://doi.org/10.1016/0017-9310(93)80028-S
@@ -654,11 +691,12 @@ def foumeny1993(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_m > 5) & (Re_m < 8500)           # foumeny1993, Fig. 1
+    & (D/D_p >= 3)                       # foumeny1993, Fig. 2
     & (phi_s >= 0.95)                    # foumeny1993
     & (ε >= 0.386) & (ε <= 0.467)        # foumeny1993, from Eq. (6)
-    & (D/D_p >= 3)                       # foumeny1993, Fig. 2
   )
 
   B = D / D_p / (0.336 * D / D_p + 2.28)
@@ -669,7 +707,7 @@ def foumeny1993(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def lee1994(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def lee1994(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Lee & Ogawa equation
   https://doi.org/10.1252/jcej.27.691
@@ -690,7 +728,7 @@ def lee1994(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwar
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def liu1994(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def liu1994(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Liu et al. equation
   https://doi.org/10.1016/0009-2509(94)00168-5
@@ -702,9 +740,9 @@ def liu1994(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwar
   Re_mod = D_p * ρ_G_avg * U_s_G_in / μ_G_avg * (1 + (1 - ε**0.5)**0.5) / (1 - ε) / ε**0.16667 # eq. (42)
   valid = (
     (Re_mod <= 6000)                     # liu1994, p. 16
+    & (D/D_p >= 1.3333)                  # liu1994 from Abstract d_s = D_p/D < 0.75
     & (phi_s >= 0.95)                    # liu1994, p. 15
     & (ε >= 0.36) & (ε <= 0.94)          # liu1994 from Tables 1 and 2 (ΔP correlation was tested on foams to mimic high voidage)
-    & (D/D_p >= 1.3333)                  # liu1994 from Abstract d_s = D_p/D < 0.75
   )
 
   A = 1 + np.pi * D_p / 6 / (1 - ε) / D
@@ -717,7 +755,7 @@ def liu1994(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwar
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def hayes1995(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def hayes1995(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Hayes et al. equation
   https://doi.org/10.1007/BF01064677
@@ -725,11 +763,12 @@ def hayes1995(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_m >= 0.1) & (Re_m <= 100_000)    # hayes1995 Figs. 2 and 3
+    & (D/D_p >= 2)                       # hayes1995 Fig. 5
     & (phi_s >= 0.95)                    # hayes1995
     & (ε >= 0.38) & (ε <= 0.43)          # hayes1995 Table 1
-    & (D/D_p >= 2)                       # hayes1995 Fig. 5
   )
   A = 850
   B = 11.6
@@ -742,16 +781,17 @@ def hayes1995(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def avontuur1996(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def avontuur1996(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Avontuur & Geldart equation
-  Avontuur, P. P. C., & Geldart, D. (1996). A quality assessment of the Ergun equation. Chem. Eng, 994-996.
+  P.P.C. Avontuur, D. Geldart. A quality assessment of the Ergun equation. *Chem. Eng.* (1996), pp. 994-996.
 
   !! orig paper wasnt found
   """
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_m <= 10_000)                   # erdim2015revisit https://doi.org/10.1016/j.powtec.2015.06.017
     #& (D/D_p > 30)                   # assumed
@@ -766,7 +806,7 @@ def avontuur1996(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, *
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def critoph1996 (D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def critoph1996 (D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Critoph & Thorpe equation
   https://doi.org/10.1016/1359-4311(95)00023-2
@@ -774,6 +814,7 @@ def critoph1996 (D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, *
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_p >= 30) & (Re_p <= 200)    # critoph1996, Fig. 7 and low-Re statement
     & (L/D >= 2.9)                  # critoph1996, from vessel D=125 mm and bed length ~360 mm
@@ -788,7 +829,7 @@ def critoph1996 (D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, *
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def oneill1997(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def oneill1997(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using O'Neill & Benyahia equation
   K. O'Neill, F. Benyahia. Packed bed systems: an insight into more flexible design. The 1997 IChemE Research Event/The Jubilee Research Event (1997), pp. 1253-1256
@@ -798,6 +839,7 @@ def oneill1997(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **k
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (D/D_p > 5)                       # erdim2015revisit https://doi.org/10.1016/j.powtec.2015.06.017
     & (phi_s >= 0.95)                 # assumed
@@ -813,7 +855,7 @@ def oneill1997(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **k
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def raichura1999(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def raichura1999(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Raichura equation
   https://doi.org/10.1080/089161599269627
@@ -821,6 +863,7 @@ def raichura1999(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, *
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_p >= 30) & (Re_p <= 1700)        # raichura1999, Abstract
     & (L/D > 3)                          # raichura1999, deduced from end effects extending ~3 Dp (p.10)
@@ -838,7 +881,7 @@ def raichura1999(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, *
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def eisfeld2001(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def eisfeld2001(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Eisfeld & Schnitzlein equation
   https://doi.org/10.1016/S0009-2509(00)00533-9
@@ -846,10 +889,11 @@ def eisfeld2001(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_p >= 0.01) & (Re_p <= 17635)     # eisfeld2001, from Conclusions
-    & (phi_s >= 0.8)                     # eisfeld2001, correlation for cylinders and spheres
     & (D/D_p >= 1.624)                   # eisfeld2001, from Conclusions
+    & (phi_s >= 0.8)                     # eisfeld2001, correlation for cylinders and spheres
     & (ε > 0.33) & (ε < 0.882)           # eisfeld2001, from Conclusions
   )
 
@@ -865,7 +909,7 @@ def eisfeld2001(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def yu2002(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def yu2002(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Yu et al. equation
   https://doi.org/10.1016/S1359-4311(01)00116-8
@@ -873,6 +917,7 @@ def yu2002(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwarg
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_p >= 750) & (Re_p <= 2500)   # yu2002
     & (D/D_p >= 30)                  # yu2002 reports D/D_p = 30
@@ -887,7 +932,7 @@ def yu2002(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwarg
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def felice2004(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, μ_G_avg, **kwargs):
+def felice2004(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, μ_G_avg, **kwargs):
   """
   Calculate pressure drop across packed bed using Di Felice & Gibilaro equation
   https://doi.org/10.1016/j.ces.2004.03.030
@@ -911,7 +956,7 @@ def felice2004(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, μ_
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def nemec2005(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def nemec2005(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Nemec & Levec equation
   https://doi.org/10.1016/j.ces.2005.05.068
@@ -919,6 +964,7 @@ def nemec2005(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_m >= 1) & (Re_m <= 1000)     # nemec2005, Conclusions
     & (D/D_p >= 10)                  # nemec2005, Sec. 3.2
@@ -935,7 +981,7 @@ def nemec2005(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def montillet2007(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def montillet2007(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Montillet et al. equation
   https://doi.org/10.1016/j.cep.2006.07.002
@@ -959,19 +1005,20 @@ def montillet2007(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, 
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def carpinlioglu2008(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def carpinlioglu2008(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
-  Calculate pressure drop across packed bed using Çarpinlioğlu equation
+  Calculate pressure drop across packed bed using Çarpinlioğlu & Özahi equation
   https://doi.org/10.1016/j.powtec.2008.01.027
   """
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
-    (Re_m >= 675) & (Re_m <= 7772)          # ccarpinliouglu2008simplified, Abstract & Conclusion
-    # & (L/D >= 0.24) & (L/D <= 1.46)       # carpinlioglu2008, Section 2, p.2 (verified range)
+    (Re_m >= 675) & (Re_m <= 7772)          # carpinliouglu2008simplified, Abstract & Conclusion
+    # & (L/D >= 0.24) & (L/D <= 1.46)       # carpinliouglu2008simplified, Section 2, p.2 (verified range)
     & (D/D_p >= 5.72)                       # ccarpinliouglu2008simplified, Table 2
-    & (phi_s >= 0.55) & (phi_s <= 1)        # ccarpinliouglu2008simplified, Conclusion
+    & (phi_s >= 0.55)                       # ccarpinliouglu2008simplified, Conclusion
     & (ε >= 0.36) & (ε <= 0.56)             # ccarpinliouglu2008simplified, Abstract & Conclusion
   )
 
@@ -981,7 +1028,7 @@ def carpinlioglu2008(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_i
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def ozahi2008(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def ozahi2008(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Özahi et al. equation
   https://doi.org/10.1163/156855208X314985
@@ -989,6 +1036,7 @@ def ozahi2008(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_m >= 708) & (Re_m <= 7772)       # ozahi2008, p. 5
     # & (L/D >= 0.24) & (L/D <= 1.46)      # ozahi2008, p. 5 (verified range)
@@ -1004,7 +1052,7 @@ def ozahi2008(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def cheng2011(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def cheng2011(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Cheng equation
   https://doi.org/10.1016/j.powtec.2011.03.026
@@ -1012,6 +1060,7 @@ def cheng2011(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_p >= 2) & (Re_p <= 5550)        # cheng2011, p. 5
     & (D/D_p >= 1.1)                    # cheng2011, Conclusions
@@ -1028,7 +1077,7 @@ def cheng2011(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def harrison2013(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def harrison2013(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Harrison et al. equation
   https://doi.org/10.1002%2Faic.14034
@@ -1036,6 +1085,7 @@ def harrison2013(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, *
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_p > 0.32) & (Re_p < 7700)        # harrison2013, Summary
     & (D/D_p > 8.3)                      # harrison2013, Summary
@@ -1052,7 +1102,7 @@ def harrison2013(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, *
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def erdim2015(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def erdim2015(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Erdim equation
   https://doi.org/10.1016/j.powtec.2015.06.017
@@ -1060,6 +1110,7 @@ def erdim2015(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_m > 2) & (Re_m < 3600)         # erdim2015, Conclusions 
     & (D/D_p > 4)                      # erdim2015, Conclusions 
@@ -1074,7 +1125,7 @@ def erdim2015(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def guo2017(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def guo2017(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Guo et al. equation
   https://doi.org/10.1016/j.ces.2017.08.022
@@ -1082,6 +1133,7 @@ def guo2017(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwar
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (D/D_p >= 1) & (D/D_p <= 2)         # guo2017, Conclusions
     & (phi_s >= 0.95)                   # guo2017
@@ -1098,7 +1150,7 @@ def guo2017(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwar
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def seckendorff2020(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def seckendorff2020(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Seckendorff et al. equation
   https://doi.org/10.1016/j.ces.2020.115644
@@ -1106,6 +1158,7 @@ def seckendorff2020(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_p >= 10) & (Re_p <= 3000)       # seckendorff2020, p. 13
     & (D/D_p >= 4)                      # seckendorff2020, Fig. 15a
@@ -1120,7 +1173,33 @@ def seckendorff2020(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def reger2023(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def cheng2021(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+  """
+  Calculate pressure drop across packed bed using Cheng et al. equation
+  https://doi.org/10.3390/en14040872
+  """
+
+  D_p = D_p_eff
+  ε = ε_eff
+  valid = (
+    (Re_p >= 200) & (Re_p <= 6400)            # cheng2021, Fig. 5
+    & (L/D >= 1.86)                           # cheng2021, H=800 mm, D=430 mm → L/D=1.86 (single value, narrow range assumed)
+    & (D/D_p >= 13.8)                         # cheng2021, from Table 1 (D=430 mm, d_p values)
+    & (phi_s >= 0.69) & (phi_s <= 0.89)       # cheng2021, from Table 1
+    & (ε >= 0.52) & (ε <= 0.54)               # cheng2021, from p. 6 (ε=0.53 for d=35 mm; other sizes not reported)
+  )
+
+  k = np.where(U_s_G_in < 1.15, 395.2, 17.2)
+  a1 = np.where(U_s_G_in < 1.15, -0.47, -0.19)
+  a2 = np.where(U_s_G_in < 1.15, -0.5, -0.15)
+  F_p = k * Re_p**a1 * (D/D_p)**a2
+  ΔP = L * F_p * ρ_G_avg * U_s_G_in**2 / D_p  # Total pressure drop
+  ΔP_array = np.where(valid, ΔP, np.nan)
+
+  return { 'ΔP': ΔP_array }
+
+############################################################################################
+def reger2023(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Reger et al. equation
   https://doi.org/10.1016/j.nucengdes.2022.112123
@@ -1128,6 +1207,7 @@ def reger2023(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_m >= 100) & (Re_m <= 10000)     # reger2023improved, Conclusion
     & (D/D_p >= 4.4)                    # reger2023improved, Table 1
@@ -1143,7 +1223,7 @@ def reger2023(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def dixon2023(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def dixon2023(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Dixon equation
   https://doi.org/10.1002/aic.18035
@@ -1152,10 +1232,11 @@ def dixon2023(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_m >= 0.01) & (Re_m <= 500_000)    # dixon2023, Conclusion
-    & (phi_s >= 0.95)                     # dixon2023
     & (D/D_p >= 5)                        # dixon2023, using eq. (10)
+    & (phi_s >= 0.95)                     # dixon2023
   )
 
   A = 160 * (1 + 2 * 0.5459 / (3 * (1 - ε) * D / D_p ))**2 # Dixon correction that sort of works for low D/Dp (5..15), Eq. (10)
@@ -1166,7 +1247,7 @@ def dixon2023(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kw
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def wu2025(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def wu2025(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Wu & Hibiki equation
   https://doi.org/10.1016/j.ijheatmasstransfer.2024.126620
@@ -1174,6 +1255,7 @@ def wu2025(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwarg
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   D_H = D_p * ε / 6 / (1 - ε)               # Eq. (6)
   valid = (
     (Re_m >= 0.173) & (Re_m <= 502_000)     # wu2025, Conclusions
@@ -1192,7 +1274,7 @@ def wu2025(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwarg
   return { 'ΔP': ΔP_array }
 
 ############################################################################################
-def xu2026(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+def xu2026(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
   """
   Calculate pressure drop across packed bed using Xu et al. equation
   https://doi.org/10.1016/j.powtec.2025.121784
@@ -1200,6 +1282,7 @@ def xu2026(D, L, D_p_eff, ε_eff, Re_m, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwarg
 
   D_p = D_p_eff
   ε = ε_eff
+  Re_m = Re_p / (1 - ε)
   valid = (
     (Re_m >= 350) & (Re_m <= 4980)         # xu2026, Sec. 4.2, Eq. (13) applicability statement
     & (L/D >= 1.8)                         # xu2026, deduced from L=600-1000 mm, D=219-325 mm (Sec. 2.1)

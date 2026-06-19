@@ -9,9 +9,20 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
+import re
 
-from config import input_params, output_params, src_models, a_rules, b_rules
-from models_misc import gas_props, water_props, liquid_holup, calculate_G_cond
+from .config import input_params, output_params, scaling_lookup, src_models, a_rules, b_rules
+from .models_misc import gas_props, water_props, liquid_holup, calculate_G_cond
+
+penalty_threshold = 8 # theta; used in weighted_median function, check_model_coverage function, and model coverage output (run function)
+
+def pretty_label(raw):
+    """Format raw model name like 'erdim2015' into 'Erdim (2015)'."""
+    import re
+    m = re.match(r'^(.*?)(\d{4})$', raw)
+    if m:
+        return f"{m.group(1).capitalize()} ({m.group(2)})"
+    return raw.capitalize()
 
 
 def color_penalties(val):
@@ -48,9 +59,8 @@ def weighted_median(values_matrix, weights_matrix):
             sorter = np.argsort(v_m)
             v_s, w_s = v_m[sorter], w_m[sorter]
             consensus[i] = v_s[np.searchsorted(np.cumsum(w_s), 0.5 * np.sum(w_s))]
-        density_threshold = 8
         log_n = np.log(n + 1)
-        log_threshold = np.log(density_threshold + 1)
+        log_threshold = np.log(penalty_threshold + 1)
         density_penalty = min(log_n / log_threshold, 1.0)
         avg_vld = np.mean(w_m)
         agreement = 1
@@ -68,6 +78,7 @@ def energyBalanceResidual(df_x, df_y):
     return q_hot - q_cold
 
 
+#deprecated function
 def check_rule_overlaps(rules):
     registry = {}
     def is_overlap(r1, r2):
@@ -118,17 +129,17 @@ def calculate_a_rule_validity(rule, active_mask, model, data_map, Y_ext, X):
         final_scores[active_mask] = scores_active
         return final_scores
     context_data = []
-    for feat in model.get('inContextLog', []):
-        val = np.log10(np.asarray(data_map[feat])[active_mask] + 1e-12)
-        context_data.append(val)
-    for feat in model.get('inContextLinear', []):
-        val = np.asarray(data_map[feat])[active_mask]
+    for feat in model.get('inContext', []):
+        if scaling_lookup.get(feat, False):
+            val = np.log10(np.asarray(data_map[feat])[active_mask] + 1e-6)
+        else:
+            val = np.asarray(data_map[feat])[active_mask]
         context_data.append(val)
     X_context = np.stack(context_data, axis=1)
     scaler = MinMaxScaler()
     X_scaled_context = scaler.fit_transform(X_context)
     tree = BallTree(X_scaled_context, leaf_size=100)
-    k = int(np.clip(np.sqrt(N_active), 40, max(40, 0.05 * N_active)))
+    k = max(40, int(np.sqrt(N_active)))
     distances, indices = tree.query(X_scaled_context, k=k)
 
     def batch_spearman_simple(a, b):
@@ -161,7 +172,7 @@ def calculate_a_rule_validity(rule, active_mask, model, data_map, Y_ext, X):
     else:
         u_v = unique_y_per_nb[range_mask]
         local_avg_uniqueness = np.nanmean(u_v) / k
-        if local_sensitivity < 0.2 or local_avg_uniqueness < 0.3:
+        if local_avg_uniqueness < 0.3:
             scores_active[range_mask] = np.nan
         else:
             if rule['expected_corr'] == 'pos':
@@ -207,9 +218,9 @@ def check_model_alignment(Y_ext, Y, V_ext, threshold_discard=0.5):
         deviation = np.abs(model_val - baseline) / (np.abs(baseline) + 1e-6)
         p_cols = [c for c in Y_ext.columns if c.endswith(f'__{p_name}')]
         n_active = Y_ext[p_cols].notna().sum(axis=1).values
-        discard_mask = (n_active >= 10) & (deviation > threshold_discard)
+        discard_mask = (n_active >= penalty_threshold) & (deviation > threshold_discard)
         V_aligned.loc[discard_mask, col] = 0.0
-        penalize_mask = (n_active < 10) & (deviation > threshold_discard)
+        penalize_mask = (n_active < penalty_threshold) & (deviation > threshold_discard)
         V_aligned.loc[penalize_mask, col] *= 0.2
     return V_aligned
 
@@ -258,7 +269,7 @@ def plot_ensemble_validity(V_ext, Y_ext, p_desc, output_dir='.'):
     y_labels = []
     for m in sort_idx:
         ds_pct = (Y_ext[m].notna().sum() / total_ds_points) * 100
-        y_labels.append(f"{m.split('__')[0]} ({ds_pct:.2f}% of DS)")
+        y_labels.append(f"{pretty_label(m.split('__')[0])} ({ds_pct:.2f}% of DS)")
     ax.set_yticks(range(n_models))
     ax.set_yticklabels(y_labels, fontsize=9)
     ax.set_xlim(0, 100)
@@ -272,6 +283,31 @@ def plot_ensemble_validity(V_ext, Y_ext, p_desc, output_dir='.'):
         Line2D([0], [0], color='black', lw=6, label='Not Validated (Skipped)')
     ]
     ax.legend(handles=legend_elements, loc='upper center', bbox_to_anchor=(0.5, -0.15), ncol=4)
+    # Collect CSV data
+    csv_rows = []
+    for m in sort_idx:
+        model_data_mask = Y_ext[m].notna()
+        n_model_data = model_data_mask.sum()
+        if n_model_data == 0:
+            continue
+        valid_scores = V_ext[m].dropna().values
+        n_verified = len(valid_scores)
+        if n_verified == 0:
+            continue
+        pct_low = round(np.sum(valid_scores < 0.2) / n_verified * 100, 2)
+        pct_med = round(np.sum((valid_scores >= 0.2) & (valid_scores <= 0.8)) / n_verified * 100, 2)
+        pct_high = round(np.sum(valid_scores > 0.8) / n_verified * 100, 2)
+        label = pretty_label(m.split('__')[0])
+        csv_rows.append({'Label': label, 'High': pct_high, 'Med': pct_med, 'Low': pct_low})
+
+    # Save CSV
+    if csv_rows:
+        csv_filename = f"{output_dir}/validity_{p_desc.replace(' ', '_').replace('℃', 'C')}.csv"
+        df_csv = pd.DataFrame(csv_rows)
+        df_csv = df_csv.sort_values('High', ascending=False)
+        df_csv.to_csv(csv_filename, index=False)
+        print(f"CSV saved to {csv_filename}")
+
     plt.grid(axis='x', linestyle='--', alpha=0.3)
     plt.subplots_adjust(right=0.85)
     plt.savefig(f"{output_dir}/validity_{p_desc.replace(' ', '_').replace('℃', 'C')}.png", dpi=150, bbox_inches='tight')
@@ -309,7 +345,7 @@ def run(ds_outputs):
         model = m_map.get(model_name)
         if not model:
             continue
-        model_context = model['inContextLinear'] + model['inContextLog'] + model['outContext']
+        model_context = model.get('inContext', []) + model.get('outContext', [])
         for rule in a_rules:
             if not set(rule['context']).issubset(set(model_context)) or Y_ext[col].isnull().all():
                 row[rule['name']] = "X"
@@ -336,7 +372,7 @@ def run(ds_outputs):
         Y_sub = Y_ext[[c for c in Y_ext.columns if c.endswith(f'__{p_name}')]]
         V_sub = V_ext[[c for c in V_ext.columns if c.endswith(f'__{p_name}')]]
         if not Y_sub.empty:
-            plot_ensemble_validity(V_sub, Y_sub, out_param['desc'])
+            plot_ensemble_validity(V_sub, Y_sub, out_param['desc'], output_dir='data')
         else:
             print(f"No data found for {out_param['desc']}")
 
@@ -386,6 +422,16 @@ def run(ds_outputs):
         Y[p_name] = cons
         V[p_name] = conf
 
+    print("\nGenerating post-consensus validity plots...")
+    for out_param in output_params:
+        p_name = out_param['name']
+        Y_sub = Y_ext[[c for c in Y_ext.columns if c.endswith(f'__{p_name}')]]
+        V_sub = V_ext_aligned[[c for c in V_ext_aligned.columns if c.endswith(f'__{p_name}')]]
+        if not Y_sub.empty:
+            plot_ensemble_validity(V_sub, Y_sub, out_param['desc'] + " (Post-Consensus)", output_dir='data')
+        else:
+            print(f"No data found for {out_param['desc']} (Post-Consensus)")
+
     print(f"\033[32mFinal consensus calculated for {len(output_params)} parameters.\033[0m\n")
     print("\033[1mDesign Space Occupancy:\033[0m")
     total_samples = len(X)
@@ -393,10 +439,59 @@ def run(ds_outputs):
         count = Y[col].notna().sum()
         print(f"  Design space coverage for {col:<12} is {(count/total_samples*100):.2f}%")
 
+    # Binary coverage matrix: ≥0.2 → covered
+    covered = (V_ext_aligned >= 0.2).astype(int)
+    n_models_covering = covered.sum(axis=1)  # total models covering each design point
+
+
+
+
+    w_name, w_val = 25, 12
+    bin_umbrella = f"{'BINARY COVERAGE':^{w_val * 5 + 4}}" 
+    weight_umbrella = f"{'WEIGHTED COVERAGE':^{w_val * 2 + 1}}"
+    umbrella_header = f"{'':<{w_name}}   {'':>{w_val}}   {bin_umbrella}   {weight_umbrella}"
+    headers = (f"{'MODEL':<{w_name}} | {'CLAIMED':>{w_val}} |"
+           f" {'SOLE':>{w_val}} {'CONTRIBUTING':>{w_val}} {'REDUNDANT':>{w_val}}"
+           f" {'TOTAL':>{w_val}} {'REDUCTION':>{w_val}} |"
+           f" {'COVERAGE':>{w_val}} {'REDUCTION':>{w_val}}")
+
+    print(umbrella_header)
+    print(headers)
+    print("-" * len(headers))
+
+    for col in Y_ext.columns.tolist():
+        model_name = re.sub(r"([a-zA-Z]+)(\d{4}).*", lambda m: f"{m.group(1).capitalize()} ({m.group(2)})", col)
+
+        # Claimed coverage (initial, before any rules)
+        model_samples = Y_ext[col].count()
+        claimed_pct = model_samples / total_samples
+
+        # Weighted coverage (sum of final validity scores / total)
+        weighted_pct = V_ext_aligned[col].sum() / total_samples
+
+        # Binary coverage categories (V_ext_aligned >= 0.2)
+        model_covered = covered[col].astype(bool)
+        n_other = n_models_covering - model_covered
+        pct_sole = (model_covered & (n_other == 0)).sum() / total_samples
+        pct_contrib = (model_covered & (n_other >= 1) & (n_other < penalty_threshold-1)).sum() / total_samples
+        pct_redund = (model_covered & (n_other >= penalty_threshold-1)).sum() / total_samples
+        pct_binary_total = pct_sole + pct_contrib + pct_redund
+
+        # Reductions (relative to originally claimed coverage)
+        binary_reduction = (claimed_pct - pct_binary_total) / claimed_pct
+        weighted_reduction = (claimed_pct - weighted_pct) / claimed_pct
+
+        print(f"{model_name:<{w_name}} | {claimed_pct:>{w_val}.2%} |"
+            f" {pct_sole:>{w_val}.2%} {pct_contrib:>{w_val}.2%} {pct_redund:>{w_val}.2%}"
+            f" {pct_binary_total:>{w_val}.2%} {binary_reduction:>{w_val}.1%} |"
+            f" {weighted_pct:>{w_val}.2%} {weighted_reduction:>{w_val}.1%}")
+
+    print(f"* The average validity score across all data points, treating validity as a continuous spectrum to reflect the overall quality of the dataset.")
+
     return {
         'Y': Y,
         'V': V,
-        'V_ext': V_ext,
+        'V_ext': V_ext_aligned,
     }
 
 

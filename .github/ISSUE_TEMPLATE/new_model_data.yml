@@ -1,0 +1,105 @@
+name: New Model Data Submission
+description: Submit a new pressure drop model for inclusion in the Optimization Framework.
+labels: ["new-model"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for contributing to the WHR Optimization Framework!
+
+        Please fill out the form below with the details of your model. Refer to
+        [CONTRIBUTING-CW.md](https://github.com/nikitin-pro/whr-optimization-framework/blob/main/CONTRIBUTING-CW.md)
+        for guidance on each section.
+
+  - type: dropdown
+    id: model_type
+    attributes:
+      label: Model Type
+      description: Specify the type of the model based on its methodology.
+      options:
+        - analytical — Pure math without any empirical coefficients
+        - semi-empirical — Elegant generalized correlations with empirical coefficients
+        - empirical — Correlations with tight validity ranges and limited physical basis
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: linear_inputs
+    attributes:
+      label: List of Input Parameters
+      description: Select input parameters your model uses.
+      options:
+        - label: L — Packed bed length
+        - label: D — Packed bed equivalent diameter
+        - label: D_p — Particle equivalent diameter
+        - label: phi_s — Particle sphericity
+        - label: h_L — Liquid holdup (for two-phase models)
+        - label: ε — Bed void fraction / porosity
+        - label: Other (please specify in the text field below)
+    validations:
+      required: true
+
+  - type: input
+    id: input_params
+    attributes:
+      label: Custom Input Parameters
+      description: If you selected "Other" above, list the additional linear input parameters separated by commas.
+      placeholder: e.g., A, B, C_custom
+
+  - type: dropdown
+    id: output_params
+    attributes:
+      label: List of Output Parameters
+      description: Select the output parameter(s) that your model calculates.
+      multiple: true
+      options:
+        - ΔP — Pressure drop
+        - Other (please specify in the text field below)
+    validations:
+      required: true
+
+  - type: input
+    id: output_params_custom
+    attributes:
+      label: Custom Output Parameters
+      description: If you selected "Other" above, specify the output parameter(s) separated by commas.
+      placeholder: e.g., f, Nu, Sh
+
+  - type: textarea
+    id: model_function
+    attributes:
+      label: Model Function
+      description: Paste your Python model function here. Follow the template shown in CONTRIBUTING-CW.md.
+      placeholder: |
+        def your_model_name(D, L, D_p_eff, ε_eff, Re_p, phi_s, ρ_G_avg, U_s_G_in, **kwargs):
+            D_p = D_p_eff
+            ε = ε_eff
+            valid = (
+                (Re_p >= min_val) & (Re_p <= max_val)
+                & (L/D >= min_val) & (L/D <= max_val)
+                & ...
+            )
+            # Model equations here
+            Delta_P = ...
+            Delta_P_array = np.where(valid, Delta_P, np.nan)
+            return {'Delta_P': Delta_P_array}
+      render: python
+    validations:
+      required: true
+
+  - type: input
+    id: doi
+    attributes:
+      label: Source Publication DOI
+      description: The Digital Object Identifier of the original publication that introduced the model.
+      placeholder: e.g., 10.1016/j.cej.2023.123456
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional_notes
+    attributes:
+      label: Additional Notes (optional)
+      description: Any other information you would like to share about the model, validity ranges, or special handling.
+      placeholder: e.g., special parameters, known limitations, test values...

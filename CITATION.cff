@@ -1,0 +1,35 @@
+cff-version: 1.2.0
+title: WHR Optimization Framework
+message: >-
+  If you use this software, please cite it using the
+  metadata from this file.
+type: software
+authors:
+  - given-names: Maxim
+    family-names: Nikitin
+    email: maxim.nikitin@gtiit.edu.cn
+    orcid: 'https://orcid.org/0000-0002-2535-6076'
+    affiliation: Guangdong Technion-Israel Institute of Technology
+repository-code: 'https://github.com/nikitin-pro/whr-optimization-framework'
+abstract: >-
+  This framework compiles and synthesizes experimental and
+  analytical data on heat and water recovery from waste flue
+  gases using randomly packed bed direct-contact condensers.
+  This synthesis automatically detects gaps in existing data
+  to guide future experimental or numerical studies.
+  Ultimately, the processed data serves as a training
+  dataset for a surrogate neural network model designed for
+  engineering and optimizing waste heat recovery (WHR)
+  units.
+keywords:
+  - "waste heat recovery"
+  - optimization
+  - "packed beds"
+  - condensation
+  - "water recovery"
+  - "neural network"
+  - dataset
+  - "experimental data"
+license: Apache-2.0
+version: 1.0.0
+date-released: '2026-06-19'

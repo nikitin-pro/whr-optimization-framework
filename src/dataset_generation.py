@@ -1,12 +1,12 @@
 import numpy as np
 import pandas as pd
+import matplotlib.pyplot as plt
+import os
 from scipy.stats import qmc
 
-from config import input_params, output_params, src_models
-from models_pressure_drop import *
-from models_mass_transfer import *
-from models_heat_transfer import *
-from models_misc import *
+from .config import input_params, output_params, src_models
+from .models_pressure_drop import *
+from .models_misc import *
 
 
 def run():
@@ -18,6 +18,9 @@ def run():
     print("\nGenerating input space using Sobol sequence...")
     sampler = qmc.Sobol(d=len(input_params), scramble=True)
     sample = sampler.random_base2(m=18)
+    # Convert open intervals to closed intervals [0, 1] for every dimension
+    # axis=0 applies the min-max scaling column-by-column
+    sample = (sample - sample.min(axis=0)) / (sample.max(axis=0) - sample.min(axis=0))
     X = pd.DataFrame()
     for i, p in enumerate(input_params):
         xi = sample[:, i]
@@ -42,26 +45,18 @@ def run():
 
     print("\033[32mInput Space initialized\033[0m\n")
     print('Samples:', len(X))
-    print('Input parameters:', list(X.columns))
+    print('Input parameters:', [c.replace('\u03b5', 'e') if isinstance(c, str) else c for c in X.columns])
 
     # 1.2 Data Map
     print("\nBuilding data map...")
     data_map = {col: X[col].values for col in X.columns}
-    data_map['T_avg'] = ((X['T_G_in'] + X['T_wtr_in']) / 2).values
     data_map['ρ_G_avg'], data_map['μ_G_avg'] = gas_props(
-        M_CO2=X['M_G_in_CO2'], M_H2O=X['M_G_in_H2O'],
-        M_O2=X['M_G_in_O2'], T=data_map['T_avg'], props=['ρ', 'μ']
-    )
-    data_map['ρ_L_avg'], data_map['μ_L_avg'] = water_props(
-        T=data_map['T_avg'], props=['ρ', 'μ']
-    )
-    data_map['G_cond'] = calculate_G_cond(**{   # estimation of condensate mass flow rate (excluding rinse water)
-        col: X[col].values for col in X.columns
-        if col in ['M_G_in_H2O', 'M_G_in_CO2', 'M_G_in_O2', 'U_s_G_in', 'T_G_in', 'T_wtr_in', 'D']
-    })
-    data_map['h_L'] = liquid_holup(**data_map)
-    data_map['ε_eff'] = X['ε'] - data_map['h_L']  # effective (wet bed) void fraction (reduced by volume occupied by the liquid)
-    data_map['D_p_eff'] = X['D_p'] * ((1 - data_map['ε_eff']) / (1 - X['ε'])) ** 0.3333  # effective (wet bed) particle diameter (enlarged by liquid volume) https://doi.org/10.1016/0950-4214(89)80016-7
+        M_CO2=np.full(len(X), 0.0004), M_H2O=np.full(len(X), 0.0115),
+        M_O2=np.full(len(X), 0.209), T=np.full(len(X), 20), props=['ρ', 'μ']
+    ) # simplified air at 20 ℃ and 1 atm
+    data_map['h_L'] = np.zeros(len(X)) # placeholder for liquid holdup
+    data_map['ε_eff'] = X['ε'] # placeholder for effective (wet bed) void fraction
+    data_map['D_p_eff'] = X['D_p']  # placeholder for effective (wet bed) particle diameter
     data_map['Re_p'] = data_map['ρ_G_avg'] * X['D_p'] * X['U_s_G_in'] / data_map['μ_G_avg']
     data_map['Re_m'] = data_map['Re_p'] / (1 - X['ε'])
 
@@ -73,16 +68,16 @@ def run():
     print("L/D range: [{:.2f}, {:.2f}]".format((X['L'] / X['D']).min(), (X['L'] / X['D']).max()))
     print("D/D_p range: [{:.2f}, {:.2f}]".format((X['D'] / X['D_p']).min(), (X['D'] / X['D_p']).max()))
 
-    # Flooding Check
-    is_valid = (data_map['h_L'] / X['ε'].values) <= 0.5
+
+    is_valid = np.ones(len(X), dtype=bool) # skip flooding check — all points are valid
     data_valid = {k: v[is_valid] for k, v in data_map.items()}
     print(f"Valid design points: {np.sum(is_valid)} / {len(X)}")
 
     # 1.3 Output Space (Y_ext)
     print("\nCalculating source model predictions...")
-    import models_pressure_drop, models_mass_transfer, models_heat_transfer, models_misc
+    from . import models_pressure_drop, models_misc
     _model_funcs = {}
-    for _mod in [models_pressure_drop, models_mass_transfer, models_heat_transfer, models_misc]:
+    for _mod in [models_pressure_drop, models_misc]:
         for _name in _mod.__all__:
             _model_funcs[_name] = getattr(_mod, _name)
 
@@ -102,9 +97,6 @@ def run():
     print("\033[32mY_ext Dataframe initialized\033[0m\n")
     print("\033[1mOutput parameters:\033[0m")
     total_samples = len(X)
-    for col in Y_ext.columns.tolist():
-        model_samples = Y_ext[col].count()
-        print(f"  {col:<25} {model_samples:<6} ({(model_samples / total_samples * 100):.2f}%)")
 
     print(f"\n\033[1mDesign Space Occupancy:\033[0m")
     for out in output_params:
@@ -117,6 +109,46 @@ def run():
     col_map = {c: c.split('__')[-1] for c in Y_ext.columns if c.split('__')[-1] in output_param_names}
     V_ext = Y_ext.notna().astype(float).replace(0, np.nan)
     V = V_ext.T.groupby(col_map).max().T
+
+    # 1.4 Design Space Coverage Histogram (Cumulative)
+    print("\n\033[1mDesign Space Coverage Histogram:\033[0m")
+    for out in output_params:
+        out_name = out['name']
+        cols = [col for col in V_ext.columns if col.endswith(f"__{out_name}")]
+        if not cols:
+            continue
+
+        # Count how many models produce a valid prediction for each sample
+        overlap_counts = V_ext[cols].notna().sum(axis=1)
+        n_total = len(overlap_counts)
+
+        # Cumulative bins: 0, 1+, 2+, ..., 10+
+        max_k = min(10, len(cols))
+        bins = list(range(max_k + 1))  # 0, 1, 2, ..., 10
+        labels = ['0'] + [f'{k}+' for k in range(1, max_k + 1)]
+
+        cumulative_pcts = []
+        for k in bins:
+            if k == 0:
+                pct = (overlap_counts == 0).sum() / n_total * 100
+            else:
+                pct = (overlap_counts >= k).sum() / n_total * 100
+            cumulative_pcts.append(pct)
+
+        fig, ax = plt.subplots(figsize=(8, 5))
+        ax.bar(bins, cumulative_pcts, width=0.6, edgecolor='black', color='steelblue')
+        ax.set_xlabel('Minimum Number of Overlapping Models')
+        ax.set_ylabel('Percentage of Design Space [%]')
+        ax.set_title(f'Cumulative Design Space Coverage — {out_name}')
+        ax.set_xticks(bins)
+        ax.set_xticklabels(labels)
+        ax.set_xlim(-0.5, max_k + 0.5)
+
+        for x, y in zip(bins, cumulative_pcts):
+            ax.text(x, y + 0.3, f'{y:.1f}%', ha='center', va='bottom', fontsize=7)
+
+        plt.tight_layout()
+        plt.show()
 
     return {
         'X': X,
