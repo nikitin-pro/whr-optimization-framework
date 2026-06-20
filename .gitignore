@@ -1,6 +1,6 @@
 __pycache__/
 private/
-push_to_github.py
+sync_code.py
 sync_wiki.py
 wiki/
 .trae/
