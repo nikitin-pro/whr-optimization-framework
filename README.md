@@ -11,7 +11,7 @@ This framework compiles and synthesizes experimental and analytical data on heat
 The framework is at the development stage now. Currently, only the hydraulics segment is available.
 
 <p align="center">
-  <a href="wiki">
+  <a href="https://github.com/nikitin-pro/whr-optimization-framework/wiki">
     <img alt="Documentation" src="https://img.shields.io/badge/Documentation-green">
   </a>
 </p>
